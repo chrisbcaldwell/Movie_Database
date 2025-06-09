@@ -1,23 +1,24 @@
 package main
 
 import (
-	//"encoding/csv"
-	_ "modernc.org/sqlite"
-	//"database/sql"
+	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+
+	_ "modernc.org/sqlite"
 )
 
 const (
 	dataFilePath string = "./data"
-	dbpath       string = "./movies.db"
+	dbPath       string = "./movies.db"
 	filePrefix   string = "IMDB-"
 )
 
 func main() {
-	os.Create(dbpath) // create empty db file
+	os.Create(dbPath) // create empty db file
 	files, err := os.ReadDir(dataFilePath)
 	if err != nil {
 		fmt.Println("path not found:", dataFilePath)
@@ -41,6 +42,7 @@ func main() {
 			newField("movie_id", "INTEGER", false, true),
 			newField("genre", "TEXT"),
 		},
+		fkeys: []fkey{{name: "movie_id", ref: "movies"}},
 	}
 	schemas["roles"] = table{
 		name: "roles",
@@ -48,6 +50,10 @@ func main() {
 			newField("actor_id", "INTEGER", false, true),
 			newField("movie_id", "INTEGER", false, true),
 			newField("role", "TEXT"),
+		},
+		fkeys: []fkey{
+			{name: "actor_id", ref: "actors"},
+			{name: "movie_id", ref: "movies"},
 		},
 	}
 	schemas["movies"] = table{
@@ -66,6 +72,7 @@ func main() {
 			newField("genre", "TEXT"),
 			newField("prob", "DOUBLE"),
 		},
+		fkeys: []fkey{{name: "director_id", ref: "directors"}},
 	}
 	schemas["actors"] = table{
 		name: "actors",
@@ -77,10 +84,36 @@ func main() {
 		},
 	}
 
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		fmt.Println("Unable to open or create database", dbPath)
+		log.Fatal(err)
+	}
+
 	for _, file := range files {
 		schema := strings.Replace(file.Name(), filePrefix, "", -1)
 		schema = strings.Replace(schema, ".csv", "", -1)
-		updateTableFromCSV(file, schemas[schema])
+		updateTableFromCSV(db, file, schemas[schema])
+	}
+
+	// looking at the status of the tables
+	for _, table := range schemas {
+		q := "SELECT * FROM " + table.name
+		result, err := db.Query(q)
+		if err != nil {
+			fmt.Println("Error querying table", table.name)
+			log.Fatal(err)
+		}
+		fmt.Println("Status of table " + table.name + ":")
+		fmt.Println("Column names and data types:")
+		fmt.Println(result.Columns())
+		fmt.Println(result.ColumnTypes())
+		var count int
+		for result.Next() {
+			count += 1
+		}
+		fmt.Println("Number of rows:", count)
+
 	}
 
 }
@@ -92,26 +125,15 @@ type field struct {
 	fkey bool
 }
 
+type fkey struct {
+	name string
+	ref  string
+}
+
 type table struct {
 	name   string
 	fields []field
-}
-
-// updateTableFromCSV creates a new table if needed, then updates based
-// on the schema given by schema
-func updateTableFromCSV(file os.DirEntry, schema table) error {
-	path := dataFilePath + "/" + file.Name()
-	f, err := os.Open(path)
-	if err != nil {
-		fmt.Println("Unable to read input file " + path)
-		return err
-	}
-	defer f.Close()
-
-	//temp
-	fmt.Println(schema)
-
-	return nil
+	fkeys  []fkey
 }
 
 // newField creates a new entity of type field.
@@ -139,4 +161,83 @@ func newField(n string, t string, keys ...bool) field {
 	}
 
 	return f
+}
+
+// updateTableFromCSV creates a new table if needed, then updates based
+// on the schema given by schema
+func updateTableFromCSV(db *sql.DB, file os.DirEntry, schema table) error {
+	path := dataFilePath + "/" + file.Name()
+	data, _, err := readCsv(path) // read CSV ignoring the header
+	if err != nil {
+		log.Fatal(err)
+	}
+	addToTable(db, schema, data)
+	return nil
+}
+
+func readCsv(filePath string) ([][]string, []string, error) {
+	// readCsv opens and reads a CSV file and returns:
+	// * Records: a slice of slices of strings, one slice per row of the input
+	// file, then one string per field in the row
+	// * a slice of strings, each string is one field name from the header row
+	f, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println("Unable to read input file " + filePath)
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	headerRow, err := r.Read()
+	if err != nil {
+		fmt.Println("Unable to parse input file as CSV for " + filePath)
+		return nil, nil, err
+	}
+
+	records, err := r.ReadAll()
+	if err != nil {
+		fmt.Println("Unable to parse input file as CSV for " + filePath)
+		return nil, nil, err
+	}
+
+	return records, headerRow, nil
+}
+
+func addToTable(db *sql.DB, t table, data [][]string) error {
+	// start the CREATE TABLE query
+	createQuery := "CREATE TABLE IF NOT EXISTS " + t.name + " (\n"
+	// add the basic info for each field
+	for _, field := range t.fields {
+		line := field.name + " " + field.typ
+		if field.pkey {
+			line = line + " PRIMARY KEY,\n"
+		} else {
+			line = line + ",\n"
+		}
+		createQuery += line
+	}
+	// add foreign key details
+	for _, fkey := range t.fkeys {
+		line := "FOREIGN KEY (" + fkey.name + ")\n"
+		line += "REFERENCES (" + fkey.ref + "),\n"
+		createQuery += line
+	}
+	createQuery += ");"
+
+	_, err := db.Exec(createQuery)
+	if err != nil {
+		fmt.Println("Error creating table", t.name)
+		log.Fatal(err)
+	}
+
+	// Add the data
+	for _, row := range data {
+		addQuery := "INSERT INTO " + t.name + " VALUES (" + strings.Join(row, ", ") + ");"
+		_, err := db.Exec(addQuery)
+		if err != nil {
+			fmt.Println("Error adding rows to table", t.name)
+			log.Fatal(err)
+		}
+	}
+	return nil
 }
