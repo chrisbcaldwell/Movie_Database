@@ -18,7 +18,7 @@ const (
 )
 
 func main() {
-	os.Create(dbPath) // create empty db file
+	// os.Create(dbPath) // create empty db file
 	files, err := os.ReadDir(dataFilePath)
 	if err != nil {
 		fmt.Println("path not found:", dataFilePath)
@@ -219,10 +219,17 @@ func addToTable(db *sql.DB, t table, data [][]string) error {
 	// add foreign key details
 	for _, fkey := range t.fkeys {
 		line := "FOREIGN KEY (" + fkey.name + ")\n"
-		line += "REFERENCES (" + fkey.ref + "),\n"
+		line += "REFERENCES " + fkey.ref + " (" + fkey.name + "),\n"
 		createQuery += line
 	}
-	createQuery += ");"
+	createQuery = strings.TrimSuffix(createQuery, ",\n") // remove the last comma
+	createQuery += "\n);"
+
+	/////////////
+	/////////////
+	fmt.Println(createQuery)
+	/////////////
+	/////////////
 
 	_, err := db.Exec(createQuery)
 	if err != nil {
@@ -230,14 +237,32 @@ func addToTable(db *sql.DB, t table, data [][]string) error {
 		log.Fatal(err)
 	}
 
-	// Add the data
-	for _, row := range data {
-		addQuery := "INSERT INTO " + t.name + " VALUES (" + strings.Join(row, ", ") + ");"
-		_, err := db.Exec(addQuery)
-		if err != nil {
-			fmt.Println("Error adding rows to table", t.name)
-			log.Fatal(err)
-		}
+	// insert data row by row
+	totalRows := len(data)
+
+	for i, row := range data {
+		fmt.Println("Table", t.name, "inserting row", i, "of", totalRows)
+		addDataRow(row, db, t)
+	}
+
+	return nil
+
+}
+
+func addDataRow(row []string, db *sql.DB, t table) error {
+	// SQLite takes text with single quotes aorund it.
+	// numerical fields are cast properly if possible
+	// single quotes w/in text need to be '' as escape characters
+	for j := range row {
+		row[j] = strings.Replace(row[j], "'", "''", -1)
+		row[j] = "'" + row[j] + "'"
+	}
+	addQuery := "INSERT INTO " + t.name + " VALUES (" + strings.Join(row, ", ") + ");"
+
+	_, err := db.Exec(addQuery)
+	if err != nil {
+		fmt.Println("Error adding rows to table", t.name)
+		log.Fatal(err)
 	}
 	return nil
 }
