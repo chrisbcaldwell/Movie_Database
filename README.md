@@ -1,6 +1,10 @@
 # Movie database project
 A **SQLite** database was built using **Go** from IMDB.com movie data.
 
+The schema for the relational database is shown below:
+
+![schema](Diagram2.png)
+
 ## Running the project
 To build the database locally, clone this repository (omitting the `movies.db` file) and run the executable `movies.exe` from the command line.  Please note that this program takes a long time (a couple of hours give or take) to run; you may wish to simply take the database file if that is what is of interest.  Alternatively, the files in the `data` folder can be temporarily moved somewhere else, leaving just one or two at a time to run.
 
@@ -26,6 +30,10 @@ Since quotation marks immediately after commas or immediately before new lines c
 Single quotation marks appearing anywhere in a text field were a problem for SQLite.  To remedy, all single quotation marks were replaced by the SQLite escape sequence `''` (two consecutive single quotation marks), followed by wrapping every field with single quotation marks.
 
 ## Possible enhancements and applications
+
+**Director relationships**
+
+Creating a table with links between movies and directors would add interesting possibilities to this project.
 
 **Personal ratings**
 
