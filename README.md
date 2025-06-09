@@ -11,7 +11,7 @@ Using Go's [sqlite package](https://pkg.go.dev/modernc.org/sqlite), a SQLite dat
 
 **CSV data extraneous quotation marks**
 
-In the source file `IMDB-movies.csv`, whenever more than one movie with the same name was recorded in the same year, the title was saved in the CSV in a format like ` ..., "Aladdin" (1993-I)", ... ` instead of ` ..., "Aladdin (1993-I)", ..., ` with quotation marks only around the full title field.  This confused the CSV reading function.  This was cleaned by simply opening the file in Notepad++ and running a find/replace command once it was discovered this was happening hundreds of times.  The file saved in the `data` folder retains these adjustments.
+In the source files `IMDB-movies.csv` and `IMDB-roles.csv`, whenever more than one movie with the same name was recorded in the same year, the title was saved in the CSV in a format like ` ..., "Aladdin" (1993-I)", ... ` instead of ` ..., "Aladdin (1993-I)", ..., ` with quotation marks only around the full title field.  This confused the CSV reading function.  This was cleaned by simply opening the file in Notepad++ and running a find/replace command once it was discovered this was happening hundreds of times.  The file saved in the `data` folder retains these adjustments.
 
 **Single quotation marks**
 
