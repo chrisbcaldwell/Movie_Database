@@ -11,7 +11,15 @@ Using Go's [sqlite package](https://pkg.go.dev/modernc.org/sqlite), a SQLite dat
 
 **CSV data extraneous quotation marks**
 
-In the source files `IMDB-movies.csv` and `IMDB-roles.csv`, whenever more than one movie with the same name was recorded in the same year, the title was saved in the CSV in a format like ` ..., "Aladdin" (1993-I)", ... ` instead of ` ..., "Aladdin (1993-I)", ..., ` with quotation marks only around the full title field.  This confused the CSV reading function.  This was cleaned by simply opening the file in Notepad++ and running a find/replace command once it was discovered this was happening hundreds of times.  The file saved in the `data` folder retains these adjustments.
+In the source files `IMDB-movies.csv` whenever more than one movie with the same name was recorded in the same year, the title was saved in the CSV in a format like ` ..., "Aladdin" (1993-I)", ... ` instead of ` ..., "Aladdin (1993-I)", ..., ` with quotation marks only around the full title field.  This confused the CSV reading function.  This was cleaned by simply opening the file in Notepad++ and running a find/replace command once it was discovered this was happening hundreds of times.  The file saved in the `data` folder retains these adjustments.
+
+For the source file `IMDB-roles.csv' this quotation mark problem was more complicated.  Several fields contained multiple quotation marks with interior commas; an example row was
+
+```
+35,2252,"(segment "Id")"
+```
+
+Since quotation marks immediately after commas or immediately before new lines can protect commas within role names, a regex find/replace was used, finding all instances of `(?<!,)"(?!\n)` and replacing with `'`.
 
 **Single quotation marks**
 
